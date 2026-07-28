@@ -1,0 +1,27 @@
+# ===========================
+# Laravel Backend
+# ===========================
+backend/price-alert-api/.env
+backend/price-alert-api/vendor/
+backend/price-alert-api/storage/logs/
+backend/price-alert-api/storage/framework/
+backend/price-alert-api/bootstrap/cache/
+backend/price-alert-api/dist/
+
+# ===========================
+# React Native / Expo Frontend
+# ===========================
+frontend/PriceandStockAlertApplication/node_modules/
+frontend/PriceandStockAlertApplication/.expo/
+frontend/PriceandStockAlertApplication/dist/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Windows
+Thumbs.db
+.DS_Store

@@ -1,0 +1,130 @@
+version: '3.8'
+
+services:
+
+  # ── PHP Laravel App ──────────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: php/Dockerfile
+    container_name: price_alert_app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - .:/var/www
+      - ./storage:/var/www/storage
+    networks:
+      - price_alert_network
+    depends_on:
+      - mysql
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 512M
+
+  # ── Nginx Web Server ─────────────────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: price_alert_nginx
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - .:/var/www
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - price_alert_network
+    depends_on:
+      - app
+
+  # ── MySQL Database ───────────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: price_alert_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: price_stock_alert_db
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_USER: price_alert_user
+      MYSQL_PASSWORD: price_alert_pass
+    ports:
+      - "3308:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - price_alert_network
+
+  # ── Laravel Scheduler ────────────────────────────────────────────────────────
+  scheduler:
+    build:
+      context: .
+      dockerfile: php/Dockerfile
+    container_name: price_alert_scheduler
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - .:/var/www
+    command: sh -c "while true; do php artisan schedule:run >> /dev/null 2>&1; sleep 60; done"
+    networks:
+      - price_alert_network
+    depends_on:
+      - mysql
+      - app
+
+  # ── Laravel Queue Worker ─────────────────────────────────────────────────────
+  queue:
+    build:
+      context: .
+      dockerfile: php/Dockerfile
+    container_name: price_alert_queue
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - .:/var/www
+    command: php artisan queue:work --sleep=3 --tries=3
+    networks:
+      - price_alert_network
+    depends_on:
+      - mysql
+      - app
+
+  # ── PhpMyAdmin ───────────────────────────────────────────────────────────────
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: price_alert_phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      MYSQL_ROOT_PASSWORD: root123
+    networks:
+      - price_alert_network
+    depends_on:
+      - mysql
+
+# ── Expo Web Frontend ──────────────────────────────────────────────────────
+  web-frontend:
+    image: nginx:alpine
+    container_name: price_alert_web
+    restart: unless-stopped
+    ports:
+      - "8082:80"
+    volumes:
+      - ./dist:/usr/share/nginx/html
+      - ./docker/nginx/web-frontend.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - price_alert_network
+
+networks:
+  price_alert_network:
+    driver: bridge
+    
+
+volumes:
+  mysql_data:
+    driver: local
